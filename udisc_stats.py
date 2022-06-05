@@ -146,7 +146,7 @@ def get_player_stats(df, player, course, layout):
         (year_df.PlayerName == player) &
         (year_df.CourseName == course) &
         (year_df.LayoutNameAdj == layout)
-    ])
+    ].dropna(axis=1, how='all'))
 
     score_df = get_score_avg(df)
     fig, ax = plt.subplots(figsize=(15, 8))
