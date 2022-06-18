@@ -179,6 +179,18 @@ def plot_month_df(viz_df, title):
                      xytext=(0,10),
                      ha='center')
 
+        
+def get_goal(df):
+    monkey_df = df[
+        (df.PlayerName == "Monkey") &
+        (df.CourseName == "Bryan Park") &
+        (df.LayoutName == "Yellows Tees")
+    ]
+
+    score = monkey_df["+/-"].sum()
+
+    print("Score:", score)
+
 def get_player_stats(df, player, course, layout, holes=None, min_date=None):
     if min_date is None:
         min_date = df.Date.min()
