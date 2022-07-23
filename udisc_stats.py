@@ -2,6 +2,7 @@ import pandas as pd
 from itertools import product
 import seaborn as sns
 import matplotlib.pyplot as plt
+import calmap
 
 seg_cols = [
     "PlayerName",
@@ -191,11 +192,26 @@ def get_goal(df):
 
     print("Score:", score)
 
+def plot_calmap(df, player):
+    count_df = df[["Date", "PlayerName", "Total"]].groupby(["Date", "PlayerName"]).count().reset_index()
+
+    player_count_df = count_df[count_df["PlayerName"] == player]
+    count_series = player_count_df.set_index("Date")["Total"]
+
+    years = list(player_count_df["Date"].map(lambda x: x.year).unique())
+
+    fig, ax = calmap.calendarplot(count_series, fillcolor='grey', fig_kws=dict(figsize=(15, 3*len(years))))
+
+    fig.suptitle(f"Number of Rounds Played Per Day By {player}", fontsize=26)
+
 def get_player_stats(df, player, course, layout, holes=None, min_date=None):
     if min_date is None:
         min_date = df.Date.min()
     if isinstance(min_date, str):
         min_date = pd.Timestamp(min_date)
+
+        
+    plot_calmap(df, player)
 
     year_df = get_year_stats(df)
     print(f"Yearly Stats for {player} at {course} from the {layout}")
