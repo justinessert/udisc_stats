@@ -1,5 +1,6 @@
 import pandas as pd
 from itertools import product
+from IPython import display
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calmap
@@ -10,40 +11,7 @@ seg_cols = [
     "LayoutNameAdj",
 ]
 
-def print_segments(df):
-    print(f"Players: {list(df.PlayerName.unique())}")
-    print(f"Courses: {list(df.CourseName.unique())}")
-    print(f"Layouts: {list(df.LayoutNameAdj.unique())}")
 
-def preprocess(df, drop_partial=True):
-    df = df.copy()
-    df.Date = pd.to_datetime(df.Date)
-
-    min_pavers_date = df[df.LayoutName == "Paver Tees"].Date.min()
-    print(min_pavers_date)
-    df["LayoutNameAdj"] = df.LayoutName
-    df.loc[
-        (df.CourseName == "Bryan Park") &
-        (df.LayoutName == "Main") &
-        (df.Date <= min_pavers_date),
-        "LayoutNameAdj"
-    ] = "Paver Tees"
-    df.loc[
-        (df.CourseName == "Bryan Park") &
-        (df.LayoutName == "Main") &
-        (df.Date > min_pavers_date),
-        "LayoutNameAdj"
-    ] = "Yellows Tees"
-
-    df['Year'] = pd.DatetimeIndex(df['Date']).year
-    
-    if drop_partial:
-        hole_cols = [x for x in df.columns if x.startswith("Hole")]
-        # Missing Scores represented as 0.0
-        for col in hole_cols:
-            df = df[df[col] != 0.0]
-    
-    return df.drop_duplicates().reset_index(drop=True)
 
 def get_year_stats(df):
     year_df = df.groupby(seg_cols + ["Year"]).mean().reset_index()
@@ -63,10 +31,10 @@ def moving_avg(df, val_col, seg_cols, date_col, period, new_col=None):
     
     return df
 
-def get_score_avg(df, periods=[5, 10, 20]):
+def get_score_avg(df, periods=[5, 10, 20], score_col="+/-"):
     periods = [5, 10, 20]
 
-    ma_df = df.rename(columns={"+/-": "Score"})
+    ma_df = df.rename(columns={score_col: "Score"})
 
     for p in periods:
         ma_df = moving_avg(
@@ -85,7 +53,7 @@ def get_score_avg(df, periods=[5, 10, 20]):
 def get_score_counts(df, period=10, holes=None):
     hole_cols = [x for x in df.columns if x.startswith("Hole")]
 
-    melt_df = df.melt(id_vars=seg_cols + ["Date"], value_vars=hole_cols)
+    melt_df = df.melt(id_vars=seg_cols + ["Date", "Year"], value_vars=hole_cols)
     melt_df.rename(columns={"variable": "Hole", "value": "Score"}, inplace=True)
     melt_df = melt_df[melt_df["Score"] != 0.0].reset_index(drop=True)
 
@@ -95,7 +63,7 @@ def get_score_counts(df, period=10, holes=None):
 
     players_df = melt_df[melt_df.PlayerName != "Par"].reset_index(drop=True)
 
-    players_par_df = players_df.merge(par_df, on=["CourseName", "LayoutNameAdj", "Date", "Hole"])
+    players_par_df = players_df.merge(par_df, on=["CourseName", "LayoutNameAdj", "Date", "Year", "Hole"])
 
     players_par_df.dropna(subset=["Score"], inplace=True)
     players_par_df["Diff"] = players_par_df.Score - players_par_df.Par
@@ -121,11 +89,11 @@ def get_score_counts(df, period=10, holes=None):
         players_par_df = players_par_df[players_par_df.Hole.isin(holes)]
 
     group_df = players_par_df[
-        seg_cols + ["Date", "ScoreName", "Score"]
-    ].groupby(seg_cols + ["Date", "ScoreName"]).count().reset_index()
+        seg_cols + ["Date", "Year", "ScoreName", "Score"]
+    ].groupby(seg_cols + ["Date", "Year", "ScoreName"]).count().reset_index()
     group_df.rename(columns={"Score": "Frequency"}, inplace=True)
 
-    idx_df = group_df[seg_cols + ["Date"]].groupby(seg_cols + ["Date"]).count().reset_index()
+    idx_df = group_df[seg_cols + ["Date", "Year"]].groupby(seg_cols + ["Date", "Year"]).count().reset_index()
     idx_df.reset_index(inplace=True)
     idx_df.rename(columns={"index": "TmpMergeCol"}, inplace=True)
 
@@ -137,8 +105,11 @@ def get_score_counts(df, period=10, holes=None):
     idx_score_name_df = idx_df.merge(score_name_df, on=["TmpMergeCol"])
     idx_score_name_df.drop("TmpMergeCol", axis=1, inplace=True)
 
-    merge_df = idx_score_name_df.merge(group_df, on=seg_cols + ["Date", "ScoreName"], how="outer")
+    merge_df = idx_score_name_df.merge(group_df, on=seg_cols + ["Date", "Year", "ScoreName"], how="outer")
     merge_df.Frequency.fillna(0.0, inplace=True)
+    
+    if not period:
+        return merge_df
 
     ma_df = moving_avg(
         df=merge_df,
@@ -150,10 +121,10 @@ def get_score_counts(df, period=10, holes=None):
     
     return ma_df
 
-def get_month_df(df):
+def get_month_df(df, score_col="+/-"):
     month_df = df.copy()
     month_df["Month"] = (month_df['Date'].dt.floor("D") + pd.offsets.MonthBegin(-1))
-    month_df.rename(columns={"+/-": "Score", "Total": "Num Rounds"}, inplace=True)
+    month_df.rename(columns={score_col: "Score", "Total": "Num Rounds"}, inplace=True)
     month_agg_df = month_df.groupby(seg_cols + ["Month"]).agg({"Score": "mean", "Num Rounds": "count"}).reset_index()
     
     return month_agg_df
@@ -166,6 +137,7 @@ def plot_month_df(viz_df, title):
     pastel_orange=(1.0, 0.7058823529411765, 0.5098039215686274)
     sns.barplot(x="MonthStr", y="Num Rounds", color=pastel_orange, data=viz_df, ax=ax)
     ax.grid(visible=True, axis="y", linestyle="--")
+    ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45)
     ax2 = ax.twinx()
     sns.lineplot(x="MonthStr", y="Score", marker='o', data=viz_df, ax=ax2)
     ax.set_title(title)
@@ -220,8 +192,10 @@ def get_player_stats(df, player, course, layout, holes=None, min_date=None):
         (year_df.CourseName == course) &
         (year_df.LayoutNameAdj == layout)
     ].dropna(axis=1, how='all'))
+    
+    score_col = "+/-" if not holes or len(holes) != 1 else holes[0]
 
-    score_df = get_score_avg(df)
+    score_df = get_score_avg(df, score_col=score_col)
     fig, ax = plt.subplots(figsize=(15, 8))
     viz_df = score_df[
         (score_df.PlayerName == player) &
@@ -245,7 +219,7 @@ def get_player_stats(df, player, course, layout, holes=None, min_date=None):
         title=f"10 Round Avg of # of Each Score Achieved by {player} at {course} on the {layout}"
     )
     
-    month_agg_df = get_month_df(df)
+    month_agg_df = get_month_df(df, score_col=score_col)
     
     viz_df = month_agg_df[
         (month_agg_df.PlayerName == player) &
