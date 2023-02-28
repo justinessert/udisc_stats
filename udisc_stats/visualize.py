@@ -1,6 +1,8 @@
+import os
+from typing import List, Optional
 import pandas as pd
 from itertools import product
-from IPython import display
+from IPython.display import display
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calmap
@@ -11,13 +13,25 @@ seg_cols = [
     "LayoutNameAdj",
 ]
 
+def _plot_or_save(fig: plt.Figure, plot_dir: Optional[str] = None, filepath: Optional[str] = None):
+    if plot_dir and filepath:
+        os.makedirs(plot_dir, exist_ok=True)
+        fig.savefig(os.path.join(plot_dir, filepath))
+    else:
+        fig.show()
 
-
-def get_year_stats(df):
+def get_year_stats(df: pd.DataFrame) -> pd.DataFrame:
     year_df = df.groupby(seg_cols + ["Year"]).mean().reset_index()
     return year_df
 
-def moving_avg(df, val_col, seg_cols, date_col, period, new_col=None):
+def moving_avg(
+    df: pd.DataFrame,
+    val_col: str,
+    seg_cols: List[str],
+    date_col: str,
+    period: int,
+    new_col: str=None,
+) -> pd.DataFrame:
     df = df.sort_values(seg_cols + [date_col]).reset_index(drop=True)
     
     date_df = df.set_index(date_col)
@@ -31,8 +45,12 @@ def moving_avg(df, val_col, seg_cols, date_col, period, new_col=None):
     
     return df
 
-def get_score_avg(df, periods=[5, 10, 20], score_col="+/-"):
-    periods = [5, 10, 20]
+def get_score_avg(
+    df: pd.DataFrame,
+    periods: List[int] = None,
+    score_col: str="+/-"
+) -> pd.DataFrame:
+    periods = periods or [5, 10, 20]
 
     ma_df = df.rename(columns={score_col: "Score"})
 
@@ -50,7 +68,11 @@ def get_score_avg(df, periods=[5, 10, 20], score_col="+/-"):
     
     return score_df
 
-def get_score_counts(df, period=10, holes=None):
+def get_score_counts(
+    df: pd.DataFrame,
+    period: int=10,
+    holes: Optional[List[str]]=None,
+) -> pd.DataFrame:
     hole_cols = [x for x in df.columns if x.startswith("Hole")]
 
     melt_df = df.melt(id_vars=seg_cols + ["Date", "Year"], value_vars=hole_cols)
@@ -121,7 +143,7 @@ def get_score_counts(df, period=10, holes=None):
     
     return ma_df
 
-def get_month_df(df, score_col="+/-"):
+def get_month_df(df: pd.DataFrame, score_col: str="+/-") -> pd.DataFrame:
     month_df = df.copy()
     month_df["Month"] = (month_df['Date'].dt.floor("D") + pd.offsets.MonthBegin(-1))
     month_df.rename(columns={score_col: "Score", "Total": "Num Rounds"}, inplace=True)
@@ -129,7 +151,7 @@ def get_month_df(df, score_col="+/-"):
     
     return month_agg_df
 
-def plot_month_df(viz_df, title):
+def plot_month_df(viz_df: pd.DataFrame, title: str) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(15, 8))
 
     viz_df["MonthStr"] = viz_df["Month"].dt.strftime("%Y-%m")
@@ -151,9 +173,11 @@ def plot_month_df(viz_df, title):
                      textcoords="offset points",
                      xytext=(0,10),
                      ha='center')
+    
+    return fig
 
         
-def get_goal(df):
+def get_goal(df: pd.DataFrame):
     monkey_df = df[
         (df.PlayerName == "Monkey") &
         (df.CourseName == "Bryan Park") &
@@ -164,7 +188,7 @@ def get_goal(df):
 
     print("Score:", score)
 
-def plot_calmap(df, player):
+def plot_calmap(df: pd.DataFrame, player: str):
     count_df = df[["Date", "PlayerName", "Total"]].groupby(["Date", "PlayerName"]).count().reset_index()
 
     player_count_df = count_df[count_df["PlayerName"] == player]
@@ -172,18 +196,28 @@ def plot_calmap(df, player):
 
     years = list(player_count_df["Date"].map(lambda x: x.year).unique())
 
-    fig, ax = calmap.calendarplot(count_series, fillcolor='grey', fig_kws=dict(figsize=(15, 3*len(years))))
+    fig, _ = calmap.calendarplot(count_series, fillcolor='grey', fig_kws=dict(figsize=(15, 3*len(years))))
 
     fig.suptitle(f"Number of Rounds Played Per Day By {player}", fontsize=26)
 
-def get_player_stats(df, player, course, layout, holes=None, min_date=None):
+    return fig
+
+def get_player_stats(
+    df: pd.DataFrame,
+    player: str,
+    course: str,
+    layout: str,
+    holes: Optional[List[str]]=None,
+    min_date: Optional[str]=None,
+    plot_dir: Optional[str]=None,
+):
     if min_date is None:
         min_date = df.Date.min()
     if isinstance(min_date, str):
         min_date = pd.Timestamp(min_date)
-
         
-    plot_calmap(df, player)
+    fig = plot_calmap(df, player)
+    _plot_or_save(fig, plot_dir, "round_calendar.png")
 
     year_df = get_year_stats(df)
     print(f"Yearly Stats for {player} at {course} from the {layout}")
@@ -203,9 +237,10 @@ def get_player_stats(df, player, course, layout, holes=None, min_date=None):
         (score_df.LayoutNameAdj == layout) &
         (score_df.Date >= min_date)
     ]
-    sns.lineplot(data=viz_df, x="Date", y="value", hue="variable", ax=ax).set(
+    fig = sns.lineplot(data=viz_df, x="Date", y="value", hue="variable", ax=ax).set(
         title=f"Score Relative to Par for {player} at {course} from the {layout}"
     )
+    _plot_or_save(fig, plot_dir, "score_summary.png")
 
     score_counts_df = get_score_counts(df, holes=holes)
     fig, ax = plt.subplots(figsize=(15, 8))
@@ -215,9 +250,10 @@ def get_player_stats(df, player, course, layout, holes=None, min_date=None):
         (score_counts_df.LayoutNameAdj == layout) &
         (score_counts_df.Date >= min_date)
     ]
-    sns.lineplot(x="Date", y="Frequency", hue="ScoreName", data=viz_df).set(
+    fig = sns.lineplot(x="Date", y="Frequency", hue="ScoreName", data=viz_df).set(
         title=f"10 Round Avg of # of Each Score Achieved by {player} at {course} on the {layout}"
     )
+    _plot_or_save(fig, plot_dir, "score_frequency.png")
     
     month_agg_df = get_month_df(df, score_col=score_col)
     
@@ -229,4 +265,5 @@ def get_player_stats(df, player, course, layout, holes=None, min_date=None):
     ]
     
     title = f"Avg Score & Number of Rounds Played by {player} at {course} on the {layout}"
-    plot_month_df(viz_df, title)
+    fig = plot_month_df(viz_df, title)
+    _plot_or_save(fig, plot_dir, "avg_score.png")

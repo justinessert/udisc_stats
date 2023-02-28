@@ -1,11 +1,11 @@
 import pandas as pd
 
-def print_segments(df):
+def print_segments(df: pd.DataFrame):
     print(f"Players: {list(df.PlayerName.unique())}")
     print(f"Courses: {list(df.CourseName.unique())}")
     print(f"Layouts: {list(df.LayoutNameAdj.unique())}")
 
-def preprocess(df, drop_partial=True):
+def preprocess(df: pd.DataFrame, drop_partial: bool=True) -> pd.DataFrame:
     df = df.copy()
     df.Date = pd.to_datetime(df.Date)
 
