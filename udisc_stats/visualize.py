@@ -1,3 +1,4 @@
+from math import ceil
 import os
 from typing import List, Optional
 import pandas as pd
@@ -13,12 +14,19 @@ seg_cols = [
     "LayoutNameAdj",
 ]
 
-def _plot_or_save(fig: plt.Figure, plot_dir: Optional[str] = None, filepath: Optional[str] = None):
+SCORE_MAP = {
+    -2.0: "Eagle-",
+    -1.0: "Birdie",
+    0.0: "Par",
+    1.0: "Bogie",
+    2.0: "Double Bogie",
+    3.0: "Triple Bogie+",
+}
+
+def _save_plot(fig: plt.Figure, plot_dir: Optional[str] = None, filepath: Optional[str] = None):
     if plot_dir and filepath:
         os.makedirs(plot_dir, exist_ok=True)
         fig.savefig(os.path.join(plot_dir, filepath))
-    else:
-        fig.show()
 
 def get_year_stats(df: pd.DataFrame) -> pd.DataFrame:
     year_df = df.groupby(seg_cols + ["Year"]).mean().reset_index()
@@ -46,37 +54,35 @@ def moving_avg(
     return df
 
 def get_score_avg(
-    df: pd.DataFrame,
+    round_score_df: pd.DataFrame,
     periods: List[int] = None,
-    score_col: str="+/-"
 ) -> pd.DataFrame:
     periods = periods or [5, 10, 20]
-
-    ma_df = df.rename(columns={score_col: "Score"})
+    ma_df = round_score_df.copy(deep=True)
 
     for p in periods:
         ma_df = moving_avg(
             df=ma_df,
-            val_col="Score",
+            val_col="Diff",
             seg_cols=seg_cols,
             date_col="Date",
             period=p,
             new_col=f"{p} Round Avg"
         )
         
-    score_df = ma_df.melt(id_vars=seg_cols + ["Date"], value_vars=["Score"] + [f"{p} Round Avg" for p in periods])
+    score_df = ma_df.melt(id_vars=seg_cols + ["Date"], value_vars=["Diff"] + [f"{p} Round Avg" for p in periods])
     
     return score_df
 
-def get_score_counts(
+def get_score_df(
     df: pd.DataFrame,
-    period: int=10,
     holes: Optional[List[str]]=None,
 ) -> pd.DataFrame:
     hole_cols = [x for x in df.columns if x.startswith("Hole")]
 
     melt_df = df.melt(id_vars=seg_cols + ["Date", "Year"], value_vars=hole_cols)
     melt_df.rename(columns={"variable": "Hole", "value": "Score"}, inplace=True)
+    melt_df.Hole = melt_df.Hole.map(lambda x: f"Hole{int(x.split('Hole')[-1]):02}")
     melt_df = melt_df[melt_df["Score"] != 0.0].reset_index(drop=True)
 
     par_df = melt_df[melt_df.PlayerName == "Par"].reset_index(drop=True)
@@ -90,17 +96,7 @@ def get_score_counts(
     players_par_df.dropna(subset=["Score"], inplace=True)
     players_par_df["Diff"] = players_par_df.Score - players_par_df.Par
 
-
-    score_map = {
-        -2.0: "Eagle-",
-        -1.0: "Birdie",
-        0.0: "Par",
-        1.0: "Bogie",
-        2.0: "Double Bogie",
-        3.0: "Triple Bogie+",
-    }
-
-    players_par_df["ScoreName"] = players_par_df["Diff"].map(lambda x: score_map[x] if x in score_map else None)
+    players_par_df["ScoreName"] = players_par_df["Diff"].map(lambda x: SCORE_MAP[x] if x in SCORE_MAP else None)
 
     players_par_df.loc[players_par_df["Diff"] < -2, "ScoreName"] = "Eagle-"
     players_par_df.loc[players_par_df["Diff"] > 3, "ScoreName"] = "Triple Bogie+"
@@ -109,8 +105,43 @@ def get_score_counts(
     
     if holes is not None:
         players_par_df = players_par_df[players_par_df.Hole.isin(holes)]
+    
+    players_par_df = players_par_df.sort_values(['Date', 'PlayerName', 'CourseName', 'LayoutNameAdj', "Hole"]).reset_index(drop=True)
+    
+    return players_par_df
 
-    group_df = players_par_df[
+def get_round_score_df(
+    score_df: pd.DataFrame,
+):
+    round_score_df = score_df.groupby(seg_cols + ["Date", "Year"]).sum().reset_index()
+    round_score_df["Diff"] = round_score_df["Score"] - round_score_df["Par"]
+
+    sort_cols = ['Date', 'PlayerName', 'CourseName', 'LayoutNameAdj']
+    round_score_df = round_score_df.sort_values(sort_cols).reset_index(drop=True)
+
+    return round_score_df
+
+def get_cumulative_score_df(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    score_df = get_score_df(df)
+
+    seg_cols = ["PlayerName", "CourseName", "LayoutNameAdj", "Date"]
+    seg_hole_cols = seg_cols + ["Hole"]
+    score_df = score_df.sort_values(seg_hole_cols).reset_index(drop=True)
+
+    score_df[
+        "CumulativeDiff"
+    ] = score_df.groupby(seg_hole_cols).sum().groupby(seg_cols).cumsum().reset_index()["Diff"].astype(float)
+
+    return score_df
+
+def get_score_counts(
+    score_df: pd.DataFrame,
+    period: Optional[int]=10,
+) -> pd.DataFrame:
+
+    group_df = score_df[
         seg_cols + ["Date", "Year", "ScoreName", "Score"]
     ].groupby(seg_cols + ["Date", "Year", "ScoreName"]).count().reset_index()
     group_df.rename(columns={"Score": "Frequency"}, inplace=True)
@@ -120,7 +151,7 @@ def get_score_counts(
     idx_df.rename(columns={"index": "TmpMergeCol"}, inplace=True)
 
     score_name_df = pd.DataFrame(
-        list(product(idx_df.TmpMergeCol.values.tolist(), list(score_map.values()))),
+        list(product(idx_df.TmpMergeCol.values.tolist(), list(SCORE_MAP.values()))),
         columns=["TmpMergeCol", "ScoreName"]
     )
 
@@ -143,11 +174,29 @@ def get_score_counts(
     
     return ma_df
 
-def get_month_df(df: pd.DataFrame, score_col: str="+/-") -> pd.DataFrame:
-    month_df = df.copy()
+def get_hist_df(player_score_df):
+    seg_cols = ["Hole", "Score", "ScoreName"]
+    hist_df = player_score_df[seg_cols + ["Diff"]].groupby(seg_cols).count().reset_index()
+    hist_df.rename(columns={"Diff": "Count"}, inplace=True)
+
+    holes = list(hist_df.Hole.unique())
+    score_names = list(hist_df.ScoreName.unique())
+
+    all_scores = pd.DataFrame(list(product(holes, score_names)), columns=["Hole", "ScoreName"])
+
+    hist_df = hist_df.merge(all_scores, on=["Hole", "ScoreName"], how="outer")
+    hist_df["Order"] = hist_df["ScoreName"].map(lambda x: score_names.index(x))
+    hist_df = hist_df.sort_values(["Hole", "Order"]).reset_index(drop=True)
+    hist_df.Count.fillna(0, inplace=True)
+
+    return hist_df
+
+
+def get_month_df(round_score_df: pd.DataFrame) -> pd.DataFrame:
+    month_df = round_score_df.copy()
     month_df["Month"] = (month_df['Date'].dt.floor("D") + pd.offsets.MonthBegin(-1))
-    month_df.rename(columns={score_col: "Score", "Total": "Num Rounds"}, inplace=True)
-    month_agg_df = month_df.groupby(seg_cols + ["Month"]).agg({"Score": "mean", "Num Rounds": "count"}).reset_index()
+    month_df["Num Rounds"] = 1
+    month_agg_df = month_df.groupby(seg_cols + ["Month"]).agg({"Diff": "mean", "Num Rounds": "count"}).reset_index()
     
     return month_agg_df
 
@@ -161,10 +210,10 @@ def plot_month_df(viz_df: pd.DataFrame, title: str) -> plt.Figure:
     ax.grid(visible=True, axis="y", linestyle="--")
     ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45)
     ax2 = ax.twinx()
-    sns.lineplot(x="MonthStr", y="Score", marker='o', data=viz_df, ax=ax2)
+    sns.lineplot(x="MonthStr", y="Diff", marker='o', data=viz_df, ax=ax2)
     ax.set_title(title)
 
-    for x,y in zip(viz_df.MonthStr, viz_df.Score):
+    for x,y in zip(viz_df.MonthStr, viz_df.Diff):
 
         label = "{:.2f}".format(y)
 
@@ -202,6 +251,30 @@ def plot_calmap(df: pd.DataFrame, player: str):
 
     return fig
 
+def plot_histogram(hist_df: pd.DataFrame) -> plt.Figure:
+    score_names = list(hist_df["ScoreName"].unique())
+    holes = list(hist_df["Hole"].unique())
+    cols = 3
+    rows = ceil(len(holes) / cols)
+    fig, axes = plt.subplots(rows, cols, figsize=(15,3*rows), sharex="all", sharey="all")
+    for i, hole in enumerate(holes):
+        row = i // cols
+        col = i % cols
+        
+        ax=axes[row][col]
+        
+        viz_df = hist_df[hist_df["Hole"] == hole]
+        
+        sns.barplot(x="ScoreName", y="Count",
+                    data=viz_df, color=sns.color_palette()[0],
+                    ax=ax,
+        )
+        ax.set_title(f"Histogram of Scores for {hole}")
+        ax.set_xticklabels(score_names, rotation = 45)
+    plt.tight_layout()
+
+    return fig
+
 def get_player_stats(
     df: pd.DataFrame,
     player: str,
@@ -215,34 +288,28 @@ def get_player_stats(
         min_date = df.Date.min()
     if isinstance(min_date, str):
         min_date = pd.Timestamp(min_date)
+
+    score_df = get_score_df(df, holes)
+    round_score_df = get_round_score_df(score_df)
         
     fig = plot_calmap(df, player)
-    _plot_or_save(fig, plot_dir, "round_calendar.png")
+    _save_plot(fig, plot_dir, "round_calendar.png")
 
-    year_df = get_year_stats(df)
-    print(f"Yearly Stats for {player} at {course} from the {layout}")
-    display(year_df[
-        (year_df.PlayerName == player) &
-        (year_df.CourseName == course) &
-        (year_df.LayoutNameAdj == layout)
-    ].dropna(axis=1, how='all'))
-    
-    score_col = "+/-" if not holes or len(holes) != 1 else holes[0]
-
-    score_df = get_score_avg(df, score_col=score_col)
+    score_avg_df = get_score_avg(round_score_df)
     fig, ax = plt.subplots(figsize=(15, 8))
-    viz_df = score_df[
-        (score_df.PlayerName == player) &
-        (score_df.CourseName == course) &
-        (score_df.LayoutNameAdj == layout) &
-        (score_df.Date >= min_date)
+    viz_df = score_avg_df[
+        (score_avg_df.PlayerName == player) &
+        (score_avg_df.CourseName == course) &
+        (score_avg_df.LayoutNameAdj == layout) &
+        (score_avg_df.Date >= min_date)
     ]
-    fig = sns.lineplot(data=viz_df, x="Date", y="value", hue="variable", ax=ax).set(
-        title=f"Score Relative to Par for {player} at {course} from the {layout}"
+    sns.lineplot(data=viz_df, x="Date", y="value", hue="variable", ax=ax)
+    ax.set_title(
+        f"Score Relative to Par for {player} at {course} from the {layout}"
     )
-    _plot_or_save(fig, plot_dir, "score_summary.png")
+    _save_plot(fig, plot_dir, "score_summary.png")
 
-    score_counts_df = get_score_counts(df, holes=holes)
+    score_counts_df = get_score_counts(score_df)
     fig, ax = plt.subplots(figsize=(15, 8))
     viz_df = score_counts_df[
         (score_counts_df.PlayerName == player) &
@@ -250,20 +317,53 @@ def get_player_stats(
         (score_counts_df.LayoutNameAdj == layout) &
         (score_counts_df.Date >= min_date)
     ]
-    fig = sns.lineplot(x="Date", y="Frequency", hue="ScoreName", data=viz_df).set(
-        title=f"10 Round Avg of # of Each Score Achieved by {player} at {course} on the {layout}"
+    sns.lineplot(x="Date", y="Frequency", hue="ScoreName", data=viz_df, ax=ax)
+    ax.set_title(
+        f"10 Round Avg of # of Each Score Achieved by {player} at {course} on the {layout}", fontsize=24,
     )
-    _plot_or_save(fig, plot_dir, "score_frequency.png")
+    _save_plot(fig, plot_dir, "score_frequency.png")
     
-    month_agg_df = get_month_df(df, score_col=score_col)
+    month_agg_df = get_month_df(round_score_df)
     
     viz_df = month_agg_df[
         (month_agg_df.PlayerName == player) &
         (month_agg_df.CourseName == course) &
         (month_agg_df.LayoutNameAdj == layout) &
         (month_agg_df.Month >= min_date)
-    ]
+    ].reset_index(drop=True)
     
     title = f"Avg Score & Number of Rounds Played by {player} at {course} on the {layout}"
     fig = plot_month_df(viz_df, title)
-    _plot_or_save(fig, plot_dir, "avg_score.png")
+    _save_plot(fig, plot_dir, "avg_score.png")
+
+    cum_score_df = get_cumulative_score_df(df)
+    player_cum_score_df = cum_score_df[
+        (cum_score_df["PlayerName"]==player) &
+        (cum_score_df["CourseName"]==course) &
+        (cum_score_df["LayoutNameAdj"]==layout)
+    ]
+
+    fig, ax = plt.subplots(figsize=(15, 15))
+    sns.boxplot(data=player_cum_score_df, x="CumulativeDiff", y="Hole", color=sns.color_palette()[0])
+    ax.grid(axis="x")
+    ax.set_title(f"Overall Score Splits for {player} at {course} from the {layout}", fontsize=24)
+    plt.tight_layout()
+    _save_plot(fig, plot_dir, "overall_splits.png")
+
+    fig, ax = plt.subplots(figsize=(15, 20))
+    sns.boxplot(data=player_cum_score_df, x="CumulativeDiff", y="Hole", hue="Year")
+    ax.grid(axis="x")
+    ax.set_title(f"Score Splits for {player} at {course} from the {layout} by Year", fontsize=24)
+    plt.tight_layout()
+    _save_plot(fig, plot_dir, "year_score_splits.png")
+
+    player_score_df = score_df[
+        (score_df.PlayerName == player) &
+        (score_df.CourseName == course) &
+        (score_df.LayoutNameAdj == layout)
+    ]
+    hist_df = get_hist_df(player_score_df)
+    fig = plot_histogram(hist_df)
+    fig.suptitle(f"Histogram of Scores per Hole for {player} at {course} from the {layout}", fontsize=24)
+    plt.tight_layout()
+    _save_plot(fig, plot_dir, "histogram.png")
