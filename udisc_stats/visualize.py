@@ -373,21 +373,25 @@ def plot_best_scores(
 
     best_overall = segment_round_score_df["Score"].values[0]
 
-    best_ytd = segment_round_score_df[
+    scores_ytd = segment_round_score_df[
         segment_round_score_df.Date >= pd.Timestamp(f"01-01-{pd.Timestamp.today().year}")
-    ]["Score"].values[0]
+    ]["Score"].values
+    best_ytd = None if len(scores_ytd) == 0 else scores_ytd[0]
 
-    best_12m = segment_round_score_df[
+    scores_12m = segment_round_score_df[
         segment_round_score_df.Date >= (today - pd.Timedelta(30 * 12, "d"))
-    ]["Score"].values[0]
+    ]["Score"].values
+    best_12m = None if len(scores_12m) == 0 else scores_12m[0]
 
-    best_6m = segment_round_score_df[
+    scores_6m = segment_round_score_df[
         segment_round_score_df.Date >= (today - pd.Timedelta(30 * 6, "d"))
-    ]["Score"].values[0]
+    ]["Score"].values
+    best_6m = None if len(scores_6m) == 0 else scores_6m[0]
 
-    best_3m = segment_round_score_df[
+    scores_3m = segment_round_score_df[
         segment_round_score_df.Date >= (today - pd.Timedelta(30 * 3, "d"))
-    ]["Score"].values[0]
+    ]["Score"].values
+    best_3m = None if len(scores_3m) == 0 else scores_3m[0]
 
     _generate_best_score_plot(
         par = par,
