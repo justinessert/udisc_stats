@@ -238,7 +238,11 @@ def get_goal(df: pd.DataFrame):
 
     print("Score:", score)
 
-def plot_calmap(df: pd.DataFrame, player: str):
+def plot_calmap(df: pd.DataFrame, player: str, course: Optional[str] = None, layout: Optional[str] = None):
+    if course is not None:
+        df = df[df.CourseName == course]
+    if layout is not None:
+        df = df[df.LayoutNameAdj == layout]
     count_df = df[["Date", "PlayerName", "Total"]].groupby(["Date", "PlayerName"]).count().reset_index()
 
     player_count_df = count_df[count_df["PlayerName"] == player]
@@ -404,6 +408,7 @@ def get_player_stats(
     holes: Optional[List[str]]=None,
     min_date: Optional[str]=None,
     plot_dir: Optional[str]=None,
+    apply_filter_to_cal: bool = False,
 ):
     if min_date is None:
         min_date = df.Date.min()
@@ -413,7 +418,8 @@ def get_player_stats(
     score_df = get_score_df(df, holes)
     round_score_df = get_round_score_df(score_df)
         
-    fig = plot_calmap(df, player)
+    extra_kwargs = {"course": course, "layout": layout} if apply_filter_to_cal else {}
+    fig = plot_calmap(df, player, **extra_kwargs)
     _save_plot(fig, plot_dir, "round_calendar.png")
 
     plot_best_scores(
