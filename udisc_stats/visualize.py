@@ -7,6 +7,7 @@ from IPython.display import display
 import seaborn as sns
 import matplotlib.pyplot as plt
 import calmap
+import plotly.graph_objects as go
 
 seg_cols = [
     "PlayerName",
@@ -275,6 +276,126 @@ def plot_histogram(hist_df: pd.DataFrame) -> plt.Figure:
 
     return fig
 
+
+def _generate_best_score_plot(
+    par: int,
+    best_overall: int,
+    best_ytd: int,
+    best_12m: int,
+    best_6m: int,
+    best_3m: int,
+    plot_dir: Optional[str] = None
+):
+
+    fig = go.Figure()
+
+    fig.update_layout(
+        title={
+            "text": "Best Round",
+            "xanchor": "center",
+            "font": {"size": 48},
+            "x": 0.5
+        }  
+    )
+
+    delta_config = {
+        'reference': par, 'relative': False, 'position' : "top", "increasing.color": "red", "decreasing.color": "green"
+    }
+
+    fig.add_trace(go.Indicator(
+        mode = "delta",
+        value = best_overall,
+        domain = {'x': [0, 1], 'y': [0.5, 1]},
+        title= {"text": "Overall"},
+        delta = delta_config))
+
+    fig.add_trace(go.Indicator(
+        mode = "delta",
+        value = best_ytd,
+        delta = delta_config,
+        title= {"text": "YTD"},
+        domain = {'x': [0, 0.45], 'y': [0.25, 0.4]}))
+
+    fig.add_trace(go.Indicator(
+        mode = "delta",
+        value = best_12m,
+        delta = delta_config,
+        title= {"text": "Last 12 Months"},
+        domain = {'x': [0.55, 1], 'y': [0.25, 0.4]}))
+
+    fig.add_trace(go.Indicator(
+        mode = "delta",
+        value = best_6m,
+        delta = delta_config,
+        title= {"text": "Last 6 Months"},
+        domain = {'x': [0, 0.45], 'y': [0, 0.15]}))
+
+    fig.add_trace(go.Indicator(
+        mode = "delta",
+        value = best_3m,
+        delta = delta_config,
+        title= {"text": "Last 3 Months"},
+        domain = {'x': [0.55, 1.0], 'y': [0, 0.15]}))
+
+    fig.show()
+    
+    if plot_dir is not None:
+        fig.write_image(os.path.join(plot_dir, "best_scores.png"))
+
+
+def plot_best_scores(
+    round_score_df: pd.DataFrame,
+    player: str,
+    course: str,
+    layout: str,
+    today: Optional[pd.Timestamp] = None,
+    plot_dir: Optional[str] = None,
+):
+    if today is None:
+        today = pd.Timestamp.today()
+
+    segment_round_score_df = round_score_df[
+        (round_score_df.PlayerName == player) &
+        (round_score_df.CourseName == course) &
+        (round_score_df.LayoutNameAdj == layout)
+    ]
+
+    segment_round_score_df = segment_round_score_df.sort_values("Score", ascending=True).reset_index(drop=True)
+
+    unique_pars = segment_round_score_df["Par"].unique()
+    assert len(unique_pars) == 1
+
+    par = unique_pars[0]
+
+    best_overall = segment_round_score_df["Score"].values[0]
+
+    best_ytd = segment_round_score_df[
+        segment_round_score_df.Date >= pd.Timestamp(f"01-01-{pd.Timestamp.today().year}")
+    ]["Score"].values[0]
+
+    best_12m = segment_round_score_df[
+        segment_round_score_df.Date >= (today - pd.Timedelta(30 * 12, "d"))
+    ]["Score"].values[0]
+
+    best_6m = segment_round_score_df[
+        segment_round_score_df.Date >= (today - pd.Timedelta(30 * 6, "d"))
+    ]["Score"].values[0]
+
+    best_3m = segment_round_score_df[
+        segment_round_score_df.Date >= (today - pd.Timedelta(30 * 3, "d"))
+    ]["Score"].values[0]
+
+    _generate_best_score_plot(
+        par = par,
+        best_overall = best_overall,
+        best_ytd = best_ytd,
+        best_12m = best_12m,
+        best_6m = best_6m,
+        best_3m = best_3m,
+        plot_dir = plot_dir,
+    )
+
+
 def get_player_stats(
     df: pd.DataFrame,
     player: str,
@@ -294,6 +415,14 @@ def get_player_stats(
         
     fig = plot_calmap(df, player)
     _save_plot(fig, plot_dir, "round_calendar.png")
+
+    plot_best_scores(
+        round_score_df=round_score_df,
+        player=player,
+        course=course,
+        layout=layout,
+        plot_dir=plot_dir,
+    )
 
     score_avg_df = get_score_avg(round_score_df)
     fig, ax = plt.subplots(figsize=(15, 8))

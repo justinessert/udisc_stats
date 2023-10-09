@@ -4,3 +4,5 @@ notebook
 seaborn
 matplotlib
 calmap
+plotly
+kaleido
