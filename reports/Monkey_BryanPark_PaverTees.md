@@ -1,12 +1,18 @@
 # Stats for Monkey at Bryan Park from the Paver Tees
 
-## Number of Rounds
+## Summary Statistics
+
+### Number of Rounds
 
 ![number_of_rounds](img/Monkey_BryanPark_PaverTees/number_of_rounds.png)
 
-## Best Round
+### Best Round
 
 ![best_scores](img/Monkey_BryanPark_PaverTees/best_scores.png)
+
+### Average Scores
+
+![average_scores](img/Monkey_BryanPark_PaverTees/average_scores.png)
 
 ## Calendar of Played Rounds
 

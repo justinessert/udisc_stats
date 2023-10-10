@@ -1,12 +1,18 @@
 # Stats for Riley at Dunncroft - Castle Point Park from the Shorts then Longs
 
-## Number of Rounds
+## Summary Statistics
+
+### Number of Rounds
 
 ![number_of_rounds](img/Riley_Dunncroft-CastlePointPark_ShortsthenLongs/number_of_rounds.png)
 
-## Best Round
+### Best Round
 
 ![best_scores](img/Riley_Dunncroft-CastlePointPark_ShortsthenLongs/best_scores.png)
+
+### Average Scores
+
+![average_scores](img/Riley_Dunncroft-CastlePointPark_ShortsthenLongs/average_scores.png)
 
 ## Calendar of Played Rounds
 

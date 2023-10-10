@@ -1,12 +1,18 @@
 # Stats for Bryan Der at Bryan Park from the Yellows Tees
 
-## Number of Rounds
+## Summary Statistics
+
+### Number of Rounds
 
 ![number_of_rounds](img/BryanDer_BryanPark_YellowsTees/number_of_rounds.png)
 
-## Best Round
+### Best Round
 
 ![best_scores](img/BryanDer_BryanPark_YellowsTees/best_scores.png)
+
+### Average Scores
+
+![average_scores](img/BryanDer_BryanPark_YellowsTees/average_scores.png)
 
 ## Calendar of Played Rounds
 
