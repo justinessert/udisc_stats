@@ -1,5 +1,9 @@
 # Stats for Monkey at Bryan Park from the Yellows Tees
 
+## Number of Rounds
+
+![number_of_rounds](img/Monkey_BryanPark_YellowsTees/number_of_rounds.png)
+
 ## Best Round
 
 ![best_scores](img/Monkey_BryanPark_YellowsTees/best_scores.png)

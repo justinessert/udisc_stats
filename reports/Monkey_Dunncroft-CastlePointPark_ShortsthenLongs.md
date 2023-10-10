@@ -1,5 +1,9 @@
 # Stats for Monkey at Dunncroft - Castle Point Park from the Shorts then Longs
 
+## Number of Rounds
+
+![number_of_rounds](img/Monkey_Dunncroft-CastlePointPark_ShortsthenLongs/number_of_rounds.png)
+
 ## Best Round
 
 ![best_scores](img/Monkey_Dunncroft-CastlePointPark_ShortsthenLongs/best_scores.png)
