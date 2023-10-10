@@ -490,7 +490,7 @@ def plot_number_of_rounds(
 
     par = unique_pars[0]
 
-    rounds_overall = segment_round_score_df["Score"].values[0]
+    rounds_overall = len(segment_round_score_df["Score"].values)
 
     rounds_ytd = len(segment_round_score_df[
         segment_round_score_df.Date >= pd.Timestamp(f"01-01-{pd.Timestamp.today().year}")
