@@ -33,6 +33,10 @@ def generate_report(
     report_list = [
         f"# Stats for {player} at {course} from the {layout}",
         "",
+        "## Number of Rounds",
+        "",
+        f"![number_of_rounds](img/{tag}/number_of_rounds.png)",
+        "",
         "## Best Round",
         "",
         f"![best_scores](img/{tag}/best_scores.png)",

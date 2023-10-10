@@ -404,6 +404,121 @@ def plot_best_scores(
     )
 
 
+def _generate_number_of_rounds_plot(
+    par: int,
+    best_overall: int,
+    best_ytd: int,
+    best_12m: int,
+    best_6m: int,
+    best_3m: int,
+    plot_dir: Optional[str] = None
+):
+
+    fig = go.Figure()
+
+    fig.update_layout(
+        title={
+            "text": "Number of Rounds",
+            "xanchor": "center",
+            "font": {"size": 48},
+            "x": 0.5
+        }  
+    )
+
+    delta_config = {
+        'reference': par, 'relative': False, 'position' : "top"
+    }
+
+    fig.add_trace(go.Indicator(
+        mode = "number",
+        value = best_overall,
+        domain = {'x': [0, 1], 'y': [0.5, 1]},
+        title= {"text": "Overall"}))
+
+    fig.add_trace(go.Indicator(
+        mode = "number",
+        value = best_ytd,
+        title= {"text": "YTD"},
+        domain = {'x': [0, 0.45], 'y': [0.25, 0.4]}))
+
+    fig.add_trace(go.Indicator(
+        mode = "number",
+        value = best_12m,
+        title= {"text": "Last 12 Months"},
+        domain = {'x': [0.55, 1], 'y': [0.25, 0.4]}))
+
+    fig.add_trace(go.Indicator(
+        mode = "number",
+        value = best_6m,
+        title= {"text": "Last 6 Months"},
+        domain = {'x': [0, 0.45], 'y': [0, 0.15]}))
+
+    fig.add_trace(go.Indicator(
+        mode = "number",
+        value = best_3m,
+        title= {"text": "Last 3 Months"},
+        domain = {'x': [0.55, 1.0], 'y': [0, 0.15]}))
+
+    fig.show()
+    
+    if plot_dir is not None:
+        # print(os.path.join(plot_dir, "best_scores.png"))
+        fig.write_image(os.path.join(plot_dir, "number_of_rounds.png"))
+
+
+def plot_number_of_rounds(
+    round_score_df: pd.DataFrame,
+    player: str,
+    course: str,
+    layout: str,
+    today: Optional[pd.Timestamp] = None,
+    plot_dir: Optional[str] = None,
+):
+    if today is None:
+        today = pd.Timestamp.today()
+
+    segment_round_score_df = round_score_df[
+        (round_score_df.PlayerName == player) &
+        (round_score_df.CourseName == course) &
+        (round_score_df.LayoutNameAdj == layout)
+    ]
+
+    segment_round_score_df = segment_round_score_df.sort_values("Score", ascending=True).reset_index(drop=True)
+
+    unique_pars = segment_round_score_df["Par"].unique()
+    assert len(unique_pars) == 1
+
+    par = unique_pars[0]
+
+    rounds_overall = segment_round_score_df["Score"].values[0]
+
+    rounds_ytd = len(segment_round_score_df[
+        segment_round_score_df.Date >= pd.Timestamp(f"01-01-{pd.Timestamp.today().year}")
+    ])
+
+    rounds_12m = len(segment_round_score_df[
+        segment_round_score_df.Date >= (today - pd.Timedelta(30 * 12, "d"))
+    ])
+
+    rounds_6m = len(segment_round_score_df[
+        segment_round_score_df.Date >= (today - pd.Timedelta(30 * 6, "d"))
+    ])
+
+    rounds_3m = len(segment_round_score_df[
+        segment_round_score_df.Date >= (today - pd.Timedelta(30 * 3, "d"))
+    ])
+
+    _generate_number_of_rounds_plot(
+        par = par,
+        best_overall = rounds_overall,
+        best_ytd = rounds_ytd,
+        best_12m = rounds_12m,
+        best_6m = rounds_6m,
+        best_3m = rounds_3m,
+        plot_dir = plot_dir,
+    )
+
+
 def get_player_stats(
     df: pd.DataFrame,
     player: str,
@@ -427,6 +542,14 @@ def get_player_stats(
     _save_plot(fig, plot_dir, "round_calendar.png")
 
     plot_best_scores(
+        round_score_df=round_score_df,
+        player=player,
+        course=course,
+        layout=layout,
+        plot_dir=plot_dir,
+    )
+
+    plot_number_of_rounds(
         round_score_df=round_score_df,
         player=player,
         course=course,
