@@ -1,5 +1,7 @@
 # Stats for Riley at Bryan Park from the Yellows Tees
 
+Includes rounds up until 2023-10-09 15:10:00
+
 ## Summary Statistics
 
 ### Number of Rounds

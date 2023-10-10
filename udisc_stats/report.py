@@ -30,8 +30,12 @@ def generate_report(
         apply_filter_to_cal = True,
     )
 
+    max_date = df.Date.max()
+
     report_list = [
         f"# Stats for {player} at {course} from the {layout}",
+        "",
+        f"Includes rounds up until {max_date}",
         "",
         "## Summary Statistics",
         "",
