@@ -24,28 +24,60 @@ Includes rounds up until 2023-10-09 15:10:00
 
 ### Average Scores By Month
 
+<details open>
+
 ![avg_score](img/Monkey_BryanPark_YellowsTees/avg_score.png)
+
+</details>
 
 ### Scores With Windowed Averages
 
+<details>
+
 ![score_summary](img/Monkey_BryanPark_YellowsTees/score_summary.png)
+
+</details>
 
 ### Number of Birdies/Pars/Bogies/Etc Over Time
 
+<details>
+
 ![score_frequency](img/Monkey_BryanPark_YellowsTees/score_frequency.png)
+
+</details>
 
 ## Score Per Hole Metrics
 
-### Scores Per Hole
+### Overall Scores Per Hole
+
+<details open>
 
 ![histogram](img/Monkey_BryanPark_YellowsTees/histogram.png)
+
+</details>
+
+### YTD Scores Per Hole
+
+<details>
+
+![histogram_ytd](img/Monkey_BryanPark_YellowsTees/histogram_ytd.png)
+
+</details>
 
 ### Cumulative Score Splits Per Hole
 
 #### Overall Cumulative Score Splits Per Hole
 
+<details open>
+
 ![overall_splits](img/Monkey_BryanPark_YellowsTees/overall_splits.png)
+
+</details>
 
 #### Per Year Cumulative Score Splits Per Hole
 
+<details>
+
 ![year_score_splits](img/Monkey_BryanPark_YellowsTees/year_score_splits.png)
+
+</details>
