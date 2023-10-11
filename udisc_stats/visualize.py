@@ -185,8 +185,10 @@ def get_hist_df(player_score_df):
 
     all_scores = pd.DataFrame(list(product(holes, score_names)), columns=["Hole", "ScoreName"])
 
+    score_order = ['Eagle-', 'Birdie', 'Par', 'Bogie', 'Double Bogie', 'Triple Bogie+']
+
     hist_df = hist_df.merge(all_scores, on=["Hole", "ScoreName"], how="outer")
-    hist_df["Order"] = hist_df["ScoreName"].map(lambda x: score_names.index(x))
+    hist_df["Order"] = hist_df["ScoreName"].map(lambda x: score_order.index(x))
     hist_df = hist_df.sort_values(["Hole", "Order"]).reset_index(drop=True)
     hist_df.Count.fillna(0, inplace=True)
     hist_df["Diff"] = hist_df["Score"] - hist_df["Par"]
