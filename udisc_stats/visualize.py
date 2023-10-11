@@ -773,6 +773,7 @@ def get_player_stats(
         player_score_df.Date >= pd.Timestamp(f"01-01-{pd.Timestamp.today().year}")
     ]
     hist_ytd_df = get_hist_df(player_score_ytd_df)
-    title = f"YTD Histogram of Scores per Hole for {player} at {course} from the {layout}"
-    fig = plot_histogram(hist_ytd_df, title=title)
-    _save_plot(fig, plot_dir, "histogram_ytd.png")
+    if not hist_ytd_df.empty:
+        title = f"YTD Histogram of Scores per Hole for {player} at {course} from the {layout}"
+        fig = plot_histogram(hist_ytd_df, title=title)
+        _save_plot(fig, plot_dir, "histogram_ytd.png")
