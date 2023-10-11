@@ -176,7 +176,7 @@ def get_score_counts(
     return ma_df
 
 def get_hist_df(player_score_df):
-    seg_cols = ["Hole", "Score", "ScoreName"]
+    seg_cols = ["Hole", "Score", "ScoreName", "Par"]
     hist_df = player_score_df[seg_cols + ["Diff"]].groupby(seg_cols).count().reset_index()
     hist_df.rename(columns={"Diff": "Count"}, inplace=True)
 
@@ -189,6 +189,7 @@ def get_hist_df(player_score_df):
     hist_df["Order"] = hist_df["ScoreName"].map(lambda x: score_names.index(x))
     hist_df = hist_df.sort_values(["Hole", "Order"]).reset_index(drop=True)
     hist_df.Count.fillna(0, inplace=True)
+    hist_df["Diff"] = hist_df["Score"] - hist_df["Par"]
 
     return hist_df
 
@@ -256,7 +257,7 @@ def plot_calmap(df: pd.DataFrame, player: str, course: Optional[str] = None, lay
 
     return fig
 
-def plot_histogram(hist_df: pd.DataFrame) -> plt.Figure:
+def plot_histogram(hist_df: pd.DataFrame, title: Optional[str] = None) -> plt.Figure:
     score_names = list(hist_df["ScoreName"].unique())
     holes = list(hist_df["Hole"].unique())
     cols = 3
@@ -265,18 +266,34 @@ def plot_histogram(hist_df: pd.DataFrame) -> plt.Figure:
     for i, hole in enumerate(holes):
         row = i // cols
         col = i % cols
-        
+
         ax=axes[row][col]
-        
+
         viz_df = hist_df[hist_df["Hole"] == hole]
-        
+
         sns.barplot(x="ScoreName", y="Count",
                     data=viz_df, color=sns.color_palette()[0],
                     ax=ax,
         )
         ax.set_title(f"Histogram of Scores for {hole}")
         ax.set_xticklabels(score_names, rotation = 45)
+
+    if title is not None:
+        fig.suptitle(f"{title}\n", fontsize=24)
+
     plt.tight_layout()
+
+    # Added after tight_layout because tight_layout doesn't work when doing this with the rest
+    for i, hole in enumerate(holes):
+        row = i // cols
+        col = i % cols
+
+        ax=axes[row][col]
+
+        viz_df = hist_df[hist_df["Hole"] == hole]
+
+        average = round((viz_df["Diff"] * viz_df["Count"]).sum() / viz_df["Count"].sum(), 2)
+        plt.text(0.7, 0.9, s = 'mean = {0}'.format(average),transform=ax.transAxes)
 
     return fig
 
@@ -746,7 +763,14 @@ def get_player_stats(
         (score_df.LayoutNameAdj == layout)
     ]
     hist_df = get_hist_df(player_score_df)
-    fig = plot_histogram(hist_df)
-    fig.suptitle(f"Histogram of Scores per Hole for {player} at {course} from the {layout}", fontsize=24)
-    plt.tight_layout()
+    title = f"Histogram of Scores per Hole for {player} at {course} from the {layout}"
+    fig = plot_histogram(hist_df, title=title)
     _save_plot(fig, plot_dir, "histogram.png")
+
+    player_score_ytd_df = player_score_df[
+        player_score_df.Date >= pd.Timestamp(f"01-01-{pd.Timestamp.today().year}")
+    ]
+    hist_ytd_df = get_hist_df(player_score_ytd_df)
+    title = f"YTD Histogram of Scores per Hole for {player} at {course} from the {layout}"
+    fig = plot_histogram(hist_ytd_df, title=title)
+    _save_plot(fig, plot_dir, "histogram_ytd.png")
