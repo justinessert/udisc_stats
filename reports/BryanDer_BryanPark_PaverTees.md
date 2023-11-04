@@ -1,6 +1,6 @@
 # Stats for Bryan Der at Bryan Park from the Paver Tees
 
-Includes rounds up until 2023-10-09 15:10:00
+Includes rounds up until 2023-11-03 21:20:00
 
 ## Summary Statistics
 
